@@ -1,3 +1,4 @@
+import os
 from agents import Runner, trace, gen_trace_id
 from search_agent import search_agent
 from planner_agent import planner_agent, WebSearchItem, WebSearchPlan
@@ -6,6 +7,18 @@ from email_agent import email_agent
 import asyncio
 
 class ResearchManager:
+
+    def create_md_report(report: ReportData)->str:
+
+        report_md = f"""
+# {report.file_name}\n\n
+## Summary:\n{report.short_summary}\n\n
+---
+{report.markdown_report}\n\n
+## Follow up questions:\n
+"""
+        for question in report.follow_up_questions:
+            report_md += f"- {question}\n"
 
     async def run(self, query: str):
         """ Run the deep research process, yielding the status updates and the final report"""
@@ -19,19 +32,23 @@ class ResearchManager:
             search_results = await self.perform_searches(search_plan)
             yield "Searches complete, writing report..."
             report = await self.write_report(query, search_results)
+            os.makedirs("reports", exist_ok=True)
+            report_file = f"reports/{report.file_name}_{trace_id}.txt"
+            with open(f"{report_file}.json", "w", encoding="utf-8") as write_report:
+                write_report.write(report.model_dump_json(indent=4))
+            # Save a dedicated copy of the pure .md file
+            with open(f"{report_file}.md", "w", encoding="utf-8") as write_md:
+                write_md.write(self.create_md_report(report))
+                
             yield "Report written, sending email..."
             await self.send_email(report)
             yield "Email sent, research complete"
-            yield report.markdown_report
-        
+            yield report.markdown_report    
 
     async def plan_searches(self, query: str) -> WebSearchPlan:
         """ Plan the searches to perform for the query """
         print("Planning searches...")
-        result = await Runner.run(
-            planner_agent,
-            f"Query: {query}",
-        )
+        result = await Runner.run(planner_agent, f"Query: {query}")
         print(f"Will perform {len(result.final_output.searches)} searches")
         return result.final_output_as(WebSearchPlan)
 

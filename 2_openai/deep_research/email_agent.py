@@ -1,17 +1,22 @@
 import os
-from typing import Dict
-
 import sendgrid
+from typing import Dict
 from sendgrid.helpers.mail import Email, Mail, Content, To
-from agents import Agent, function_tool
+from openai import AsyncOpenAI
+from agents import Agent, OpenAIChatCompletionsModel, function_tool
+
+OLLAMA_BASE_URL = "http://localhost:11434/v1"
+LAMMA_GEMMA_4="gemma4:31b-cloud"
+ollama_client = AsyncOpenAI(base_url=OLLAMA_BASE_URL, api_key="ok_to_pass")
+ollama_model = OpenAIChatCompletionsModel(model=LAMMA_GEMMA_4, openai_client=ollama_client)
 
 
 @function_tool
-def send_email(subject: str, html_body: str) -> Dict[str, str]:
+def send_email_tool(subject: str, html_body: str) -> Dict[str, str]:
     """Send an email with the given subject and HTML body"""
-    sg = sendgrid.SendGridAPIClient(api_key=os.environ.get("SENDGRID_API_KEY"))
-    from_email = Email("ed@edwarddonner.com")  # put your verified sender here
-    to_email = To("ed.donner@gmail.com")  # put your recipient here
+    sg = sendgrid.SendGridAPIClient(api_key=os.environ.get('SENDGRID_API_KEY'))
+    from_email = Email("marcelo.marques@vitarts.com.br")  # Change to your verified sender
+    to_email = To("mgmarques3000@gmail.com")  # Change to your recipient
     content = Content("text/html", html_body)
     mail = Mail(from_email, to_email, subject, content).get()
     response = sg.client.mail.send.post(request_body=mail)
@@ -26,6 +31,6 @@ report converted into clean, well presented HTML with an appropriate subject lin
 email_agent = Agent(
     name="Email agent",
     instructions=INSTRUCTIONS,
-    tools=[send_email],
-    model="gpt-4o-mini",
+    tools=[send_email_tool],
+    model=ollama_model,
 )
